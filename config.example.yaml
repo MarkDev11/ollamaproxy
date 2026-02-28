@@ -1,0 +1,17 @@
+ollama_cloud:
+  accounts:
+    - name: "account-1"
+      api_key: "your_api_key_here"
+      priority: 1
+    - name: "account-2"
+      api_key: "your_api_key_here"
+      priority: 2
+
+proxy:
+  host: "localhost"
+  port: 8080
+  api_key: "my-secret-key"
+
+fallback:
+  retry_attempts: 3
+  timeout: 30
