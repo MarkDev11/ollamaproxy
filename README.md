@@ -1,23 +1,24 @@
-# Ollama Cloud Proxy dengan Failover
+# Ollama Cloud Proxy
 
-API proxy untuk Ollama Cloud dengan dukungan multiple accounts dan automatic failover. Dirancang untuk digunakan dengan OpenCode sebagai custom provider.
+API proxy for Ollama Cloud with multiple accounts support and automatic failover. Designed for use with OpenCode as a custom provider.
 
-## Fitur
+## Features
 
-- **Multiple Ollama Cloud Accounts** - Support hingga 6 akun Ollama Cloud
-- **Automatic Failover** - Otomatis switch ke akun berikutnya jika gagal
-- **OpenAI-Compatible API** - Compatible dengan OpenCode dan library OpenAI
-- **Health Monitoring** - Endpoint untuk cek status setiap akun
+- **Multiple Ollama Cloud Accounts** - Support up to 6 Ollama Cloud accounts
+- **Automatic Failover** - Automatically switch to next account if failed
+- **OpenAI-Compatible API** - Compatible with OpenCode and OpenAI libraries
+- **Health Monitoring** - Endpoint to check status of each account
+- **Streaming Support** - Real-time streaming responses
 
-## Instalasi
+## Installation
 
 ```bash
 pip install -r requirements.txt
 ```
 
-## Konfigurasi
+## Configuration
 
-Edit file `config.yaml`:
+Copy `config.example.yaml` to `config.yaml` and edit:
 
 ```yaml
 ollama_cloud:
@@ -28,10 +29,9 @@ ollama_cloud:
     - name: "account-2"
       api_key: "ollama_api_key_2"
       priority: 2
-    # Tambahkan akun lain sesuai kebutuhan...
 
 proxy:
-  host: "0.0.0.0"
+  host: "localhost"
   port: 8080
   api_key: "my-secret-key"
 
@@ -40,13 +40,13 @@ fallback:
   timeout: 30
 ```
 
-## Menjalankan Server
+## Running the Server
 
 ```bash
 python main.py
 ```
 
-Server akan berjalan di `http://localhost:8080`
+Server will run at `http://localhost:8080`
 
 ## API Endpoints
 
@@ -68,8 +68,6 @@ Response:
 
 ```
 GET /v1/models
-Headers:
-  x-api-key: my-secret-key
 ```
 
 Response:
@@ -78,7 +76,7 @@ Response:
   "object": "list",
   "data": [
     {
-      "id": "qwen3-coder:480b-cloud",
+      "id": "glm-5:cloud",
       "object": "model",
       "created": 0,
       "owned_by": "ollama"
@@ -91,13 +89,10 @@ Response:
 
 ```
 POST /v1/chat/completions
-Headers:
-  Content-Type: application/json
-  x-api-key: my-secret-key
+Content-Type: application/json
 
-Body:
 {
-  "model": "qwen3-coder:480b-cloud",
+  "model": "glm-5:cloud",
   "messages": [
     {"role": "user", "content": "Hello!"}
   ],
@@ -111,7 +106,7 @@ Response:
   "id": "chatcmpl-1234567890",
   "object": "chat.completion",
   "created": 1234567890,
-  "model": "qwen3-coder:480b-cloud",
+  "model": "glm-5:cloud",
   "choices": [
     {
       "index": 0,
@@ -125,28 +120,10 @@ Response:
 }
 ```
 
-### Text Completions
-
-```
-POST /v1/completions
-Headers:
-  Content-Type: application/json
-  x-api-key: my-secret-key
-
-Body:
-{
-  "model": "qwen3-coder:480b-cloud",
-  "prompt": "Hello!",
-  "stream": false
-}
-```
-
-### Status Akun
+### Account Status
 
 ```
 GET /status
-Headers:
-  x-api-key: my-secret-key
 ```
 
 Response:
@@ -154,114 +131,92 @@ Response:
 {
   "accounts": [
     {"name": "account-1", "status": "online"},
-    {"name": "account-2", "status": "online"},
-    {"name": "account-3", "status": "offline", "error": "..."}
+    {"name": "account-2", "status": "offline", "error": "..."}
   ]
 }
 ```
 
-## Integrasi dengan OpenCode
+## OpenCode Integration
 
-### Langkah 1: Edit Konfigurasi OpenCode
+### Step 1: Edit OpenCode Configuration
 
-File: `~/.config/opencode/opencode.json`
+File: `~/.config/opencode/opencode.jsonc`
 
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "qwen3-coder:480b-cloud",
+  "disabled_providers": [],
   "provider": {
-    "my-ollama": {
+    "ollamaa": {
+      "name": "ollamaa",
       "npm": "@ai-sdk/openai-compatible",
+      "models": {
+        "glm-5:cloud": { "name": "glm-5" },
+        "kimi-k2.5:cloud": { "name": "kimi-k2.5" }
+      },
       "options": {
-        "baseURL": "http://localhost:8080/v1",
-        "apiKey": "my-secret-key"
+        "baseURL": "http://localhost:8080/v1"
       }
     }
   }
 }
 ```
 
-### Langkah 2: Restart OpenCode
+### Step 2: Restart OpenCode
 
-Tutup dan buka kembali OpenCode untuk memuat konfigurasi baru.
+Close and reopen OpenCode to load the new configuration.
 
-## Model yang Tersedia
+## Available Models
 
-Berdasarkan Ollama Cloud, beberapa model yang tersedia:
+From Ollama Cloud:
 
-- `qwen3-coder:480b-cloud` - Qwen Coder (480B parameters)
-- `deepseek-v3.1:671b-cloud` - DeepSeek V3.1
-- `gpt-oss:20b-cloud` - GPT OSS (20B)
-- `gpt-oss:120b-cloud` - GPT OSS (120B)
+- `glm-5:cloud` - GLM-5
+- `kimi-k2.5:cloud` - Kimi K2.5
+- `qwen3-coder-next:cloud` - Qwen3 Coder Next
+- `minimax-m2.5:cloud` - MiniMax M2.5
 
-## Cara Kerja Failover
+## How Failover Works
 
-1. Request masuk ke `/v1/chat/completions`
-2. Proxy mencoba akun pertama (priority 1)
-3. Jika gagal, retry hingga 3x (konfigurasi `retry_attempts`)
-4. Jika masih gagal, switch ke akun berikutnya
-5. Return response dari akun yang berhasil
+1. Request comes to `/v1/chat/completions`
+2. Proxy tries first account (priority 1)
+3. If failed, retry up to 3x (configurable)
+4. If still failed, switch to next account
+5. Return response from successful account
 
 ## Troubleshooting
 
-### Server tidak bisa start
+### Server won't start
 
-Pastikan port 8080 tidak digunakan:
+Make sure port 8080 is not in use:
 
 ```bash
 netstat -ano | findstr :8080
 ```
 
-Ganti port di `config.yaml` jika diperlukan.
+Change port in `config.yaml` if needed.
 
-### Semua akun offline
+### All accounts offline
 
-- Cek koneksi internet
-- Verify API key di `config.yaml`
-- Cek status di `http://localhost:8080/status`
+- Check internet connection
+- Verify API keys in `config.yaml`
+- Check status at `http://localhost:8080/status`
 
-### OpenCode tidak bisa connect
+### OpenCode can't connect
 
-- Pastikan server berjalan: `curl http://localhost:8080/health`
-- Verify `baseURL` di OpenCode config: `http://localhost:8080/v1`
-- Cek API key match antara `config.yaml` dan OpenCode config
+- Ensure server is running: `curl http://localhost:8080/health`
+- Verify `baseURL` in OpenCode config: `http://localhost:8080/v1`
 
-## Struktur Project
+## Project Structure
 
 ```
-porxyollama/
-├── config.yaml          # Konfigurasi akun dan server
+ollamaproxy/
+├── config.example.yaml   # Example configuration
+├── config.yaml           # Your configuration (gitignored)
 ├── main.py              # FastAPI server
 ├── requirements.txt     # Python dependencies
-└── README.md            # Dokumentasi ini
+└── README.md            # This file
 ```
 
-## Development
-
-### Menambahkan Akun Baru
-
-1. Edit `config.yaml`
-2. Tambahkan akun baru dengan priority unik:
-
-```yaml
-accounts:
-  - name: "account-7"
-    api_key: "new_api_key"
-    priority: 7
-```
-
-3. Restart server (Ctrl+C, lalu `python main.py`)
-
-### Mengubah Port
-
-Edit `config.yaml`:
-
-```yaml
-proxy:
-  port: 9000  # Port baru
-```
-
-## Lisensi
+## License
 
 MIT
